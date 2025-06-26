@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Image Clusterer</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 min-h-screen flex flex-col items-center justify-center p-6">
+  <h1 class="text-3xl font-bold mb-4">Image Clustering with CLIP + KMeans</h1>
+
+  <div id="drop-zone" class="w-full max-w-lg bg-white border-2 border-dashed border-gray-400 p-6 rounded-lg text-center hover:bg-gray-50 cursor-pointer">
+    <p class="text-gray-600">📁 Drag & drop images here or click to select</p>
+    <input type="file" id="file-input" class="hidden" multiple accept="image/*">
+  </div>
+
+  <div id="file-preview" class="flex flex-wrap gap-4 mt-6"></div>
+
+  <div class="flex gap-4 mt-6">
+    <button id="embed-btn" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">Generate Embeddings</button>
+    <a href="/download_clusters" class="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600">Download Clusters</a>
+  </div>
+
+  <p id="status" class="mt-4 text-sm text-gray-600"></p>
+
+  <script>
+    const dropZone = document.getElementById('drop-zone');
+    const fileInput = document.getElementById('file-input');
+    const preview = document.getElementById('file-preview');
+    const status = document.getElementById('status');
+
+    dropZone.addEventListener('click', () => fileInput.click());
+
+    dropZone.addEventListener('dragover', e => {
+      e.preventDefault();
+      dropZone.classList.add('bg-gray-200');
+    });
+
+    dropZone.addEventListener('dragleave', () => {
+      dropZone.classList.remove('bg-gray-200');
+    });
+
+    dropZone.addEventListener('drop', e => {
+      e.preventDefault();
+      dropZone.classList.remove('bg-gray-200');
+      handleFiles(e.dataTransfer.files);
+    });
+
+    fileInput.addEventListener('change', () => {
+      handleFiles(fileInput.files);
+    });
+
+    function handleFiles(files) {
+      preview.innerHTML = '';
+      status.textContent = `Uploading ${files.length} file(s)...`;
+      [...files].forEach(file => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          const img = document.createElement('img');
+          img.src = reader.result;
+          img.className = "w-32 h-32 object-cover border rounded";
+          preview.appendChild(img);
+        };
+        reader.readAsDataURL(file);
+
+        const formData = new FormData();
+        formData.append('file', file);
+        fetch('/upload', { method: 'POST', body: formData })
+          .then(res => res.json())
+          .then(data => {
+            if (data.success) {
+              status.textContent = `Uploaded: ${file.name}`;
+            } else {
+              status.textContent = `Failed to upload ${file.name}`;
+            }
+          });
+      });
+    }
+
+    document.getElementById('embed-btn').addEventListener('click', () => {
+      status.textContent = "Generating embeddings and clustering...";
+      fetch('/generate_embeddings', { method: 'POST' })
+        .then(res => res.json())
+        .then(data => {
+          if (data.success) {
+            status.textContent = "Clustering complete! You can now download.";
+          } else {
+            status.textContent = "Error: " + data.message;
+          }
+        });
+    });
+  </script>
+</body>
+</html>
